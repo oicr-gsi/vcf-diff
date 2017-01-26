@@ -16,33 +16,51 @@ use strict;
 use Getopt::Long;
 use Data::Dumper;
 use constant DEBUG=>0;
+use IO::Uncompress::Gunzip qw(gunzip $GunzipError) ;
+
 
 my($gatk,$sent);
 my $USAGE  = "./call_joiner.pl --gatk [vcf made with gatk] --sentieon [vcf file made with Sentieon]\n";
 my $result = GetOptions('gatk=s'          => \$gatk,
                         'sentieon|sent=s' => \$sent); 
 
+
+
 ($gatk && $sent) or die $USAGE;
+print "Both files are defined: ".$gatk." and ".$sent."\n" if DEBUG;
 my @tools = ("gatk","sentieon");
 my @files = ($gatk,$sent);
-my %data  = ();
+
+#secretly a hash reference
+my $datas;
+
 # Read data from files
+print "Starting to read data\n" if DEBUG;
 for (my $t = 0; $t < @tools; $t++) {
- &read_data($tools[$t],$files[$t]); 
+ my $cur_tool=$tools[$t];
+ my $temphash=&read_data($cur_tool,$files[$t]);
+ 
+ while( my ($chrompos, $toolhash) = each %$temphash ) {
+  $datas->{$chrompos}->{$cur_tool}=$temphash->{$chrompos}->{$cur_tool};
+ }
+
 }
 
 # Print out the results
 print join("\t",qw(Coord Sentieon GATK Type))."\n";
-print %data;
-foreach my $coord(sort keys %data) {
- foreach my $field('Score','AD1','AD2','DP','GQ') {
+
+my @coord_sorted = sort keys %$datas;
+foreach my $coord(@coord_sorted) {
+ foreach my $field('Score','AD','DP','GQ') {
    print $coord;
    foreach my $tool(@tools) {
-     print "\t".$data{$coord}->{$tool}->{$field};
-   }
-   print "\t$field\n";
+    if (exists($datas->{$coord}->{$tool})) {
+     print "\t".$datas->{$coord}->{$tool}->{$field};
+    } 
+    else { print "\t"; }
+  }
+  print "\t$field\n";
  }
- 
 }
 
 =head2
@@ -52,30 +70,70 @@ foreach my $coord(sort keys %data) {
 
 =cut
 
-sub read_data {
+sub read_data 
+{
+ my($tool,$file) = @_;
+ my $DATA;
+ my $data;
+ print "Filename: ".$file."\n" if DEBUG;
+ if($file =~ m/\.gz$/i)
+ {
+    $DATA = new IO::Uncompress::Gunzip $file
+        or die "IO::Uncompress::Gunzip failed: $GunzipError\n";
+    print "Zipped: ".$DATA."\n" if DEBUG;
+    $data=&extract_info($tool,$DATA);
+ }
+ else
+ {
+    $DATA = IO::File->new($file)
+        or die "Couldn't read from submitted file [$file]";
+    print "Not zipped: ".$DATA."\n" if DEBUG;
+    $data=&extract_info($tool,$DATA);
+ }
+ return $data;
+}
+
+sub extract_info 
+{
 
  my($tool,$file) = @_;
- my $pipe = "cut -f 1,2,6,10 $file | ";
- open(DATA,"$pipe") or die "Couldn't read from submitted file [$file]";
- while (<DATA>) {
-    chomp;
-    s/:/\t/g;
-    s/,/\t/g;
-    s/\t/:/;
-    print STDERR "String: ".$_."\n" if DEBUG;
-    my @temp = split("\t");
-    if (@temp < 7) {next;}
-    #if ($temp[0] && $temp[1] && $temp[3] && $temp[4] && $temp[5] && $temp[6]) {
-    $data{$temp[0]}->{$tool} = {Score=>$temp[1],
-                                AD1  =>$temp[3],
-                                AD2  =>$temp[4],
-                                DP   =>$temp[5],
-                                GQ   =>$temp[6]};
-    #}
-    print STDERR Dumper(%data) if DEBUG;
-    exit if DEBUG;
+ my $data;
+ while (my $line = <$file>)
+ {
+    chomp $line;
+    my @columns = split (/\t/, $line);
+    if (@columns < 10) {next;}
+    #cutting out the CHROM, POS, QUAL, FORMAT, and sample genotype columns
+    my ($chrompos, $qual, $format, $genotype) = ($columns[0].":".$columns[1],$columns[5],$columns[8],$columns[9]);
+    #returns hash reference
+    my $genotype_hash=&find_info_headings($format,$genotype);
+    $data->{$chrompos}->{$tool} = $genotype_hash;
+    $data->{$chrompos}->{$tool}->{'Score'}=$qual;
  }
+ #print Dumper(\$data);
+ return $data;
+}
 
- close DATA;
+sub find_info_headings
+{
+  my($format,$genotype) = @_;
+  my @headings = ("AD","DP","GQ","GT");
+
+  my %line=();
+  my @fo_col = split(/:/,$format);
+  my @ge_col = split(/:/,$genotype);
+  
+  for (my $i=0; $i<@fo_col; $i++ )
+  {
+   my ($fo, $ge) = ($fo_col[$i], $ge_col[$i]);
+   foreach (@headings)
+   {
+    if (m/$fo/i)
+    {
+     $line{$fo}=$ge;
+    }
+   }
+  }
+  return \%line;
 }
 
