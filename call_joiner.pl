@@ -51,7 +51,11 @@ print join("\t",qw(Coord Sentieon GATK Type))."\n";
 
 my @coord_sorted = sort keys %$datas;
 foreach my $coord(@coord_sorted) {
- foreach my $field('Score','AD','DP','GQ') {
+
+ #assumption here is that the first tool in list has all fields we're interested in
+ my ( $t, $f_ref ) = each %$datas->{$coord};
+
+ foreach my $field( sort keys %$f_ref) {
    print $coord;
    foreach my $tool(@tools) {
     if (exists($datas->{$coord}->{$tool})) {
@@ -108,7 +112,7 @@ sub extract_info
     #returns hash reference
     my $genotype_hash=&find_info_headings($format,$genotype);
     $data->{$chrompos}->{$tool} = $genotype_hash;
-    $data->{$chrompos}->{$tool}->{'Score'}=$qual;
+    $data->{$chrompos}->{$tool}->{'Qual'}=$qual;
  }
  #print Dumper(\$data);
  return $data;
@@ -117,12 +121,13 @@ sub extract_info
 sub find_info_headings
 {
   my($format,$genotype) = @_;
-  my @headings = ("AD","DP","GQ","GT");
+  my @headings = ("AD","DP","GQ","GT","PL");
 
-  my %line=();
+  my %heads=();
   my @fo_col = split(/:/,$format);
   my @ge_col = split(/:/,$genotype);
-  
+ 
+  #iterate through the format column and pull out the desired headings 
   for (my $i=0; $i<@fo_col; $i++ )
   {
    my ($fo, $ge) = ($fo_col[$i], $ge_col[$i]);
@@ -130,10 +135,25 @@ sub find_info_headings
    {
     if (m/$fo/i)
     {
-     $line{$fo}=$ge;
+     
+     #if the field has a , | or / as a separator, record them separately
+     if ($ge =~ m/[,\/|]{1}/)
+     {
+      my @tings=split(/[,\/|]{1}/,$ge);
+      for (my $j=1; $j<=@tings; $j++)
+      {
+       $heads{$fo.$j}=$tings[($j-1)];
+      }
+      
+     }
+     else
+     {
+       $heads{$fo}=$ge;
+     }
     }
    }
   }
-  return \%line;
+
+  return \%heads;
 }
 
