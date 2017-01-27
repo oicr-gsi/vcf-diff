@@ -106,7 +106,7 @@ sub extract_info
  {
     chomp $line;
     my @columns = split (/\t/, $line);
-    if (@columns < 10) {next;}
+    if (@columns < 10 || $columns[0] =~ m/#CHROM/ ) {next;}
     #cutting out the CHROM, POS, QUAL, FORMAT, and sample genotype columns
     my ($chrompos, $qual, $format, $genotype) = ($columns[0].":".$columns[1],$columns[5],$columns[8],$columns[9]);
     #returns hash reference
