@@ -6,9 +6,9 @@ Ways of comparing VCF files produced by two different methods.
 
 ## 1. Join VCF fields from two different tools with call_joiner.pl
 
-Join VCFs genotype fields produced by two different methods into one file. Either vcf or gzipped vcf may be used.
+Join VCFs genotype fields produced by two different methods into one file. Either vcf or gzipped vcf may be used. This is pretty memory intensive, with 2 ~200MB vcf files needing about 10GB of RAM.
 ```
-perl call_joiner.pl --gatk sample.gatk.vcf --sentieon sample.sentieon.vcf > sample.combined.vcf
+perl call_joiner.pl --gatk sample.gatk.vcf --sentieon sample.sentieon.vcf > sample.combined.df
 ```
 
 This produces a file that looks like this and can be read into R.
@@ -35,7 +35,7 @@ The different format codes may or may not have a number after it, which indicate
 For each 'Type' in from the file above, plot a correlation of GATK v. Sentieon. The script is intended to combine the results from multiple joinings.
 
 ```
-Rscript Sentieon.R sample1.joined sample2.joined sample3.joined
+Rscript Sentieon.R sample1.combined.df sample2.combined.df sample3.combined.df
 ```
 
 And produces lovely graphs like these:
