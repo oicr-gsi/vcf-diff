@@ -58,10 +58,10 @@ foreach my $coord(@coord_sorted) {
  foreach my $field( sort keys %$f_ref) {
    print $coord;
    foreach my $tool(@tools) {
-    if (exists($datas->{$coord}->{$tool})) {
+    if (exists($datas->{$coord}->{$tool}->{$field})) {
      print "\t".$datas->{$coord}->{$tool}->{$field};
     } 
-    else { print "\t"; }
+    else { print "\tNA"; }
   }
   print "\t$field\n";
  }
