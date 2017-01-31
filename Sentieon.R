@@ -1,37 +1,47 @@
-# Script for making sense of Sinteion/GATK comparisons
-#library(lattice)
-library(package = "lattice")
+#!/usr/bin/env Rscript
+library(lattice)
 
-GATK.TAB<-read.table("gatk.f10.tabbed",header=F)
-SINT.TAB<-read.table("sint.f10.tabbed",header=F)
+vcf.diff <- function(args) {
+  # test if there is at least one argument: if not, return an error
+  if (length(args)==0) {
+    stop("At least one argument must be supplied (input file).n", call.=FALSE)
+  }
 
-colnames(GATK.TAB)<-c("GT","AD","DP","GQ","PL")
-colnames(SINT.TAB)<-c("GT","AD","DP","GQ","PL")
+  #iterate through file paths and bind them together in massive data frame
+  DATA<-do.call(rbind, lapply(args,read.table, header=T) )
+  
+  DATA.nona<-DATA[!is.na(DATA$GATK),]
+  DATA.nona<-DATA.nona[!is.na(DATA.nona$Sentieon),]
+  sapply(levels(DATA.nona$Type), plotthings, DATA=DATA.nona)
 
+  png("summary.png")
+  with(DATA,xyplot(Sentieon ~ GATK | Type))
+  dev.off()
+}
 
-DP<-as.data.frame(cbind(GATK=GATK.TAB$DP,SINT=SINT.TAB$DP))
-GQ<-as.data.frame(cbind(GATK=GATK.TAB$GQ,SINT=SINT.TAB$GQ))
+plotthings <- function(lvl, DATA) {
+   print(paste("Starting level: ",lvl))
+   sub<-DATA[DATA$Type==lvl,]
+   sub<-sub[!is.na(sub$GATK),]
+   sub<-sub[!is.na(sub$Sentieon),]
+   
+   png(paste("comparison",lvl,"png",sep="."))
+   plot(sub$GATK, sub$Sentieon, 
+        type="p", 
+        main=paste("Comparison of", lvl,"scores in GATK and Sentieon variants", sep=" "), 
+        xlab=paste("GATK",lvl, sep=" "), 
+        ylab=paste("Sentieon",lvl, sep=" "),
+        col="blue")
+   abline(a=0,b=1, col="gray60")
+   fit<-lm(Sentieon~GATK,sub)
+   if (!is.na(fit$coefficients[2])) {
+    abline(fit, col="blue")
+   }
+   r2=summary(fit)$r.squared
+   eqn <- bquote(r^2 == .(r2))
+   text (2, max(sub$Sentieon), eqn, pos=4, col="blue")
+   dev.off()
+}
 
-with(DP, xyplot(GATK ~ SINT))
-with(GQ, xyplot(GATK ~ SINT))
-
-# Working with better organized data frame
-
-DATA<-read.table("sentieon.gatk_data.csv", header = T)
-
-DATA<-read.table("DCIS_0029_Br_P_TS_2.isec_data.csv", header = T)
-DATA<-read.table("DCIS_0034_Br_R_TS_1.isec_data.csv", header = T)
-DATA<-read.table("DCIS_0038_Br_R_TS_1.isec_data.csv", header = T)
-DATA<-read.table("DCIS_0046_Br_P_TS_1.isec_data.csv", header = T)
-DATA<-read.table("DCIS_0048_Br_P_TS_1.isec_data.csv", header = T)
-
-DATA<-read.table("HALT_0220_Pb_R_EX_31001210.isec_data.csv", header = T)
-DATA<-read.table("HALT_0238_Bm_R_EX_31001419.isec_data.csv", header = T)
-DATA<-read.table("HALT_1617_Bm_P_EX_31001234.isec_data.csv", header = T)
-DATA<-read.table("HALT_1643_Pb_P_EX_31001184.isec_data.csv", header = T)
-DATA<-read.table("HALT_1644_Pb_R_EX_31001189.isec_data.csv", header = T)
-DATA<-read.table("HALT_1646_Pb_R_EX_31001194.isec_data.csv", header = T)
-
-with(DATA[DATA$Type!="Score",],xyplot(Sentineon ~ GATK | Type))
-with(DATA[DATA$Type=="Score",],xyplot(Sentineon ~ GATK | Type))
-
+args = commandArgs(trailingOnly=TRUE)
+vcf.diff(args)
