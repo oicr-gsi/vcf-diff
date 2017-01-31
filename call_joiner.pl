@@ -53,8 +53,7 @@ my @coord_sorted = sort keys %$datas;
 foreach my $coord(@coord_sorted) {
 
  #assumption here is that the first tool in list has all fields we're interested in
- my ( $t, $f_ref ) = each %$datas->{$coord};
-
+ my ( $t, $f_ref ) = each %$datas{$coord};
  foreach my $field( sort keys %$f_ref) {
    print $coord;
    foreach my $tool(@tools) {
@@ -139,7 +138,7 @@ sub find_info_headings
      #if the field has a , | or / as a separator, record them separately
      if ($ge =~ m/[,\/|]{1}/)
      {
-      my @tings=split(/[,\/|]{1}/,$ge);
+      my @tings=sort split(/[,\/|]{1}/,$ge);
       for (my $j=1; $j<=@tings; $j++)
       {
        $heads{$fo.$j}=$tings[($j-1)];
